@@ -1,8 +1,12 @@
+import sys
 from classes import AsciiFieldType, NumberFieldType, HexFieldType, FieldData, FieldType
 from helper_functions import parseStructure, parseArray, printTable
 import table_structures as ts
 
-file_name = "gilbert.otf"
+if len(sys.argv) != 2:
+    exit()
+
+file_name = sys.argv[1]
 
 f = open(file_name, 'rb')
 
@@ -32,7 +36,6 @@ records = parseArray(f, ts.svg_document_record, num_svg_records)
 
 printTable('SVG Records', ts.svg_document_record, records)
 
-# grab record 1 say!
 for i in range(10):
     row = records[i]
     offset_to_doc = row['svgDocOffset'].getData() + offset_to_svg_doc_list
