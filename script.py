@@ -1,108 +1,44 @@
-from collections import OrderedDict
-
-class FieldType:
-    def __init__(self, size):
-        self.size = size
-
-class AsciiFieldType(FieldType):
-    @classmethod
-    def getData(cls, data_field):
-        return (data_field.byte_string).decode('ascii')
-
-    @classmethod
-    def getStr(cls, data_field):
-        return cls.getData(data_field)
-
-
-class NumberFieldType(FieldType):
-    @classmethod
-    def getData(cls, data_field):
-        return int.from_bytes(data_field.byte_string, byteorder='big')
-
-    @classmethod
-    def getStr(cls, data_field):
-        return str(cls.getData(data_field))
-
-
-class HexFieldType(FieldType):
-    @classmethod
-    def getData(cls, data_field):
-        return hex(int.from_bytes(data_field.byte_string, byteorder='big'))
-
-    @classmethod
-    def getStr(cls, data_field):
-        return str(cls.getData(data_field))
-
-class FieldData:
-    def __init__(self, field_type, byte_string):
-        self.field_type = field_type
-        self.byte_string = byte_string
-
-    def __str__(self):
-        return self.field_type.getStr(self)
-
-    __repr__ = __str__
-
-# Structure to handle offset_table
-offset_table = OrderedDict()
-offset_table['sfntVersion'] = HexFieldType(4)
-offset_table['numTables'] = NumberFieldType(2)
-offset_table['searchRange'] = NumberFieldType(2)
-offset_table['entrySelector'] = NumberFieldType(2)
-offset_table['rangeShift'] =  NumberFieldType(2)
-
-# Structure to handle a Table Record in dir_tables
-table_record = OrderedDict()
-table_record['tableTag'] = AsciiFieldType(4)
-table_record['checkSum'] = HexFieldType(4)
-table_record['offset'] = NumberFieldType(4)
-table_record['length'] = NumberFieldType(4)
-
-
+from classes import AsciiFieldType, NumberFieldType, HexFieldType, FieldData, FieldType
+from helper_functions import parseStructure, parseArray, printTable
+import table_structures as ts
 
 file_name = "gilbert.otf"
 
 f = open(file_name, 'rb')
 
-results = OrderedDict()
 
-def parseStructure(struct_table):
-    results = OrderedDict()
-    for key, value in struct_table.items():
-        if isinstance(value, FieldType):
-            results[key] = FieldData(value, f.read(value.size))
-    return results
+offset_tabl = parseStructure(f, ts.offset_table)
+table_records = parseArray(f, ts.table_record, offset_tabl['numTables'].getData());
+#fs = printTable("Offsets Table", ts.offset_table, [offset_tabl])
+#fs = printTable("Dir Table", ts.table_record, table_records)
 
-def parseArray(structure, count):
-    results = []
-    for i in range(count):
-        results.append(parseStructure(structure))
-    return results
+offset_to_svg = None
+for row in table_records:
+    if row['tableTag'].getData() == 'SVG ':
+        offset_to_svg = row['offset'].getData()
+f.seek(offset_to_svg)
 
-offset_tabl = parseStructure(offset_table)
+header = parseStructure(f, ts.svg_table_header) 
 
-table_records = parseArray(table_record, 14);
+offset_to_svg_doc_list = header['offsetToSVGDocumentList'].getData() + offset_to_svg
 
-def printTable(table_name, structure, table):
-    print("{:^100}".format(table_name))
-    print("-"*100)
-    offset = 20
-    first = False
-    format_string = ""
-    for key, val in structure.items():
-        if first == False:
-            format_string = "{:>0}"
-        else:
-            format_string += "{:>" + str(offset) + "}"
-        first = True
-    print(format_string.format(*[item[0] for item in structure.items()]))
-    print("-"*100)
-    for row in table:
-        print(format_string.format(*[str(item[1]) for item in row.items()]))
+f.seek(offset_to_svg_doc_list)
 
+svg_doc_list = parseStructure(f, ts.svg_document_list)
 
-fs = printTable("Offsets Table", offset_table, [offset_tabl])
+num_svg_records = svg_doc_list['numEntries'].getData()
 
-fs = printTable("Dir Table", table_record, table_records)
+records = parseArray(f, ts.svg_document_record, num_svg_records)
 
+printTable('SVG Records', ts.svg_document_record, records)
 
+# grab record 1 say!
+for i in range(10):
+    row = records[i]
+    offset_to_doc = row['svgDocOffset'].getData() + offset_to_svg_doc_list
+    svg_doc_length = row['svgDocLength'].getData()
+    f.seek(offset_to_doc)
+    document = (f.read(svg_doc_length)).decode('ascii')
+    print("\n")
+    print("\n")
+    print(document)
