@@ -3,10 +3,11 @@ from classes import AsciiFieldType, NumberFieldType, HexFieldType, FieldData, Fi
 from helper_functions import parseStructure, parseArray, printTable
 import table_structures as ts
 
-if len(sys.argv) != 2:
+if len(sys.argv) != 3:
     exit()
 
 file_name = sys.argv[1]
+docs_to_extract = int(sys.argv[2])
 
 f = open(file_name, 'rb')
 
@@ -36,7 +37,7 @@ records = parseArray(f, ts.svg_document_record, num_svg_records)
 
 printTable('SVG Records', ts.svg_document_record, records)
 
-for i in range(10):
+for i in range(docs_to_extract):
     row = records[i]
     offset_to_doc = row['svgDocOffset'].getData() + offset_to_svg_doc_list
     svg_doc_length = row['svgDocLength'].getData()
